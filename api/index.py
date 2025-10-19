@@ -28,16 +28,22 @@ def get_db():
         global client
         mongo_uri = os.environ.get('MONGODB_URI')
         if not mongo_uri:
-            # If MONGODB_URI is not set, create it with the default Atlas format
-            mongo_uri = "mongodb+srv://celticheroesdcmb:Suppmain123@cluster0.mongodb.net/damage_ranger?retryWrites=true&w=majority"
+            mongo_uri = "mongodb+srv://celticheroesdcmb:Suppmain123@cluster0.ognfnvj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
             os.environ['MONGODB_URI'] = mongo_uri
+            print("Using default MongoDB URI")
             
         if client is None:
             print(f"Attempting to connect to MongoDB...")
+            # Parse the URI to get the database name
+            from urllib.parse import urlparse
+            uri_parts = urlparse(mongo_uri)
+            db_name = uri_parts.path.strip('/') or 'damage_ranger'
+            
             client = MongoClient(mongo_uri, 
-                               serverSelectionTimeoutMS=5000,
-                               connectTimeoutMS=5000,
-                               socketTimeoutMS=5000)
+                               serverSelectionTimeoutMS=10000,  # Increased timeout
+                               connectTimeoutMS=10000,
+                               socketTimeoutMS=10000,
+                               retryWrites=True)
             # Test the connection explicitly
             client.admin.command('ping')
             print("Successfully connected to MongoDB")
@@ -50,11 +56,23 @@ def get_db():
 
 @app.before_request
 def before_request():
-    g.db = get_db()
-    if g.db is None:
+    try:
+        g.db = get_db()
+        if g.db is None:
+            print("Database connection returned None")
+            return jsonify({
+                "error": "Database connection failed",
+                "message": "Could not connect to MongoDB. Please check your connection string and network settings."
+            }), 500
+            
+        # Verify we can actually perform operations
+        g.db.command('ping')
+    except Exception as e:
+        print(f"Before request error: {str(e)}")
+        traceback.print_exc()
         return jsonify({
             "error": "Database connection failed",
-            "message": "Could not connect to MongoDB. Please check your connection string and network settings."
+            "message": f"MongoDB Error: {str(e)}"
         }), 500
 
 @app.teardown_appcontext
