@@ -114,19 +114,7 @@ def admin_required(f):
 
 @app.route('/')
 def index():
-    try:
-        # No need to close client in serverless; connection is per-request
-        return jsonify({
-            "status": "ok",
-            "message": "API is running",
-            "database": "connected"
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e),
-            "database": "disconnected"
-        }), 500
+    return redirect(url_for('login'))
 
 @app.route('/calculator')
 @login_required
