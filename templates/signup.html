@@ -66,23 +66,28 @@ document.getElementById('signup-form').addEventListener('submit', async function
     
     try {
         const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
         const response = await fetch('/signup', {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
         });
         
-        const data = await response.json();
+        const result = await response.json();
         
         if (response.ok) {
             // Successful signup
-            if (data.role === 'admin') {
+            if (result.role === 'admin') {
                 window.location.href = '/calculator';  // Redirect admin to calculator
             } else {
                 window.location.href = '/pending';     // Redirect regular user to pending page
             }
         } else {
             // Show error message
-            errorText.textContent = data.message || 'An error occurred during signup';
+            errorText.textContent = result.message || 'An error occurred during signup';
             errorDiv.classList.remove('hidden');
         }
     } catch (error) {

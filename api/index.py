@@ -28,26 +28,22 @@ def get_db():
         global client
         mongo_uri = os.environ.get('MONGODB_URI')
         if not mongo_uri:
-            mongo_uri = "mongodb+srv://celticheroesdcmb:Suppmain123@cluster0.ognfnvj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-            os.environ['MONGODB_URI'] = mongo_uri
-            print("Using default MongoDB URI")
-            
+            print("Error: MONGODB_URI environment variable is not set")
+            return None
         if client is None:
             print(f"Attempting to connect to MongoDB...")
-            # Parse the URI to get the database name
-            from urllib.parse import urlparse
-            uri_parts = urlparse(mongo_uri)
-            db_name = uri_parts.path.strip('/') or 'damage_ranger'
-            
-            client = MongoClient(mongo_uri, 
-                               serverSelectionTimeoutMS=10000,  # Increased timeout
-                               connectTimeoutMS=10000,
-                               socketTimeoutMS=10000,
-                               retryWrites=True)
-            # Test the connection explicitly
-            client.admin.command('ping')
-            print("Successfully connected to MongoDB")
-        return client.get_default_database()
+            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000, socketTimeoutMS=10000)
+            try:
+                client.admin.command('ping')
+                print("Successfully connected to MongoDB")
+            except Exception as e:
+                print(f"MongoDB ping failed: {str(e)}")
+                return None
+        # Get database name from URI or default to 'damage_ranger'
+        from urllib.parse import urlparse
+        uri_parts = urlparse(mongo_uri)
+        db_name = uri_parts.path.strip('/') or 'damage_ranger'
+        return client[db_name]
     except Exception as e:
         print(f"MongoDB Connection Error: {str(e)}")
         print(f"Connection String: {mongo_uri if mongo_uri else 'Not set'}")
