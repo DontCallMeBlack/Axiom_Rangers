@@ -27,37 +27,43 @@ def get_db():
     global client
     try:
         mongo_uri = os.environ.get('MONGODB_URI')
+        print(f"DEBUG: MONGODB_URI from env: {mongo_uri}")
         if not mongo_uri:
-            print("Error: MONGODB_URI environment variable is not set")
+            print("ERROR: MONGODB_URI environment variable is not set")
             return None
         if client is None:
-            print(f"Attempting to connect to MongoDB...")
+            print(f"DEBUG: Attempting to connect to MongoDB...")
             client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000, socketTimeoutMS=10000)
-            client.admin.command('ping')
-            print("Successfully connected to MongoDB")
-        # Always use 'damage_ranger' database
+            try:
+                client.admin.command('ping')
+                print("DEBUG: Successfully connected to MongoDB")
+            except Exception as e:
+                print(f"ERROR: MongoDB ping failed: {str(e)}")
+                traceback.print_exc()
+                return None
+        print("DEBUG: Returning client['damage_ranger']")
         return client['damage_ranger']
     except Exception as e:
-        print(f"MongoDB Connection Error: {str(e)}")
-        print(f"Connection String: {os.environ.get('MONGODB_URI') if os.environ.get('MONGODB_URI') else 'Not set'}")
+        print(f"ERROR: MongoDB Connection Exception: {str(e)}")
+        print(f"DEBUG: Connection String: {os.environ.get('MONGODB_URI') if os.environ.get('MONGODB_URI') else 'Not set'}")
         traceback.print_exc()
         return None
 
 @app.before_request
 def before_request():
     try:
+        print("DEBUG: Running before_request")
         g.db = get_db()
         if g.db is None:
-            print("Database connection returned None")
+            print("ERROR: Database connection returned None")
             return jsonify({
                 "error": "Database connection failed",
                 "message": "Could not connect to MongoDB. Please check your connection string and network settings."
             }), 500
-            
-        # Verify we can actually perform operations
+        print("DEBUG: Running g.db.command('ping')")
         g.db.command('ping')
     except Exception as e:
-        print(f"Before request error: {str(e)}")
+        print(f"ERROR: Before request exception: {str(e)}")
         traceback.print_exc()
         return jsonify({
             "error": "Database connection failed",
