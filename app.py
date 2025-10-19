@@ -1,3 +1,6 @@
+# NOTE: This file is not used for Vercel deployment and has been disabled to avoid conflicts.
+# The main application logic is in `api/index.py`.
+"""
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_pymongo import PyMongo
@@ -156,3 +159,4 @@ def delete_user(user_id):
 
 if __name__ == '__main__':
     app.run(debug=True)
+"""

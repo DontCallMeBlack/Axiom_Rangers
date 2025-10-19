@@ -11,8 +11,5 @@
             "src": "/(.*)",
             "dest": "api/index.py"
         }
-    ],
-    "env": {
-        "MONGODB_URI": "mongodb+srv://celticheroesdcmb:Suppmain123@cluster0.ognfnvj.mongodb.net/damage_ranger?retryWrites=true&w=majority&appName=Cluster0"
-    }
+    ]
 }

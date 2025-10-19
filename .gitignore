@@ -20,3 +20,12 @@ pids
 *.pid
 *.seed
 *.pid.lock
+
+# Environment variables
+.env
+
+# Python artifacts
+__pycache__/
+*.pyc
+venv/
+.venv/
