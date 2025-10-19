@@ -26,11 +26,25 @@ client = None
 def get_db():
     try:
         global client
+        mongo_uri = os.environ.get('MONGODB_URI')
+        if not mongo_uri:
+            # If MONGODB_URI is not set, create it with the default Atlas format
+            mongo_uri = "mongodb+srv://celticheroesdcmb:Suppmain123@cluster0.mongodb.net/damage_ranger?retryWrites=true&w=majority"
+            os.environ['MONGODB_URI'] = mongo_uri
+            
         if client is None:
-            client = MongoClient(os.environ.get('MONGODB_URI'), serverSelectionTimeoutMS=5000)
+            print(f"Attempting to connect to MongoDB...")
+            client = MongoClient(mongo_uri, 
+                               serverSelectionTimeoutMS=5000,
+                               connectTimeoutMS=5000,
+                               socketTimeoutMS=5000)
+            # Test the connection explicitly
+            client.admin.command('ping')
+            print("Successfully connected to MongoDB")
         return client.get_default_database()
     except Exception as e:
         print(f"MongoDB Connection Error: {str(e)}")
+        print(f"Connection String: {mongo_uri if mongo_uri else 'Not set'}")
         traceback.print_exc()
         return None
 
