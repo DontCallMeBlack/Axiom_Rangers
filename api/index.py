@@ -20,13 +20,28 @@ def internal_error(error):
 def not_found_error(error):
     return jsonify({"error": "Not Found", "details": str(error)}), 404
 
-try:
-    # Initialize MongoDB connection
-    client = MongoClient(os.environ.get('MONGODB_URI'))
-    db = client.get_default_database()
-except Exception as e:
-    print(f"MongoDB Connection Error: {str(e)}")
-    traceback.print_exc()
+# Initialize MongoDB connection
+def get_db():
+    try:
+        client = MongoClient(os.environ.get('MONGODB_URI'))
+        db = client.get_default_database()
+        # Test the connection
+        db.command('ping')
+        return db
+    except Exception as e:
+        print(f"MongoDB Connection Error: {str(e)}")
+        traceback.print_exc()
+        return None
+
+db = get_db()
+
+@app.before_request
+def check_db_connection():
+    if not db:
+        return jsonify({
+            "error": "Database connection failed",
+            "message": "Could not connect to MongoDB. Please check your connection string and network settings."
+        }), 500
 
 # Generate a secret key if not exists
 def get_or_create_secret_key():
@@ -77,8 +92,24 @@ def admin_required(f):
     return decorated_function
 
 @app.route('/')
-@login_required
 def index():
+    try:
+        if db.command('ping'):
+            return jsonify({
+                "status": "ok",
+                "message": "Application is running",
+                "database": "connected"
+            })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "database": "disconnected"
+        }), 500
+
+@app.route('/calculator')
+@login_required
+def calculator():
     if not current_user.approved:
         flash('Your account is pending approval.', 'warning')
         return redirect(url_for('pending'))
@@ -87,29 +118,77 @@ def index():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        name = request.form.get('name')
+        try:
+            data = request.form
+            if not data:
+                data = request.get_json()  # Try to get JSON data if form data is not present
+            
+            email = data.get('email')
+            password = data.get('password')
+            name = data.get('name')
 
-        if db.users.find_one({'email': email}):
-            flash('Email already registered', 'error')
-            return redirect(url_for('signup'))
+            if not all([email, password, name]):
+                return jsonify({
+                    'error': 'Missing required fields',
+                    'message': 'Email, password, and name are required'
+                }), 400
 
-        hashed_password = generate_password_hash(password)
-        user_data = {
-            'email': email,
-            'password': hashed_password,
-            'name': name,
-            'role': 'user',
-            'approved': False
-        }
-        
-        # Make first user an admin
-        if db.users.count_documents({}) == 0:
-            user_data['role'] = 'admin'
-            user_data['approved'] = True
+            # Check if user exists
+            existing_user = db.users.find_one({'email': email})
+            if existing_user:
+                return jsonify({
+                    'error': 'User exists',
+                    'message': 'Email already registered'
+                }), 409
 
-        db.users.insert_one(user_data)
+            # Create user data
+            hashed_password = generate_password_hash(password)
+            user_data = {
+                'email': email,
+                'password': hashed_password,
+                'name': name,
+                'role': 'user',
+                'approved': False
+            }
+
+            # Make first user an admin
+            try:
+                user_count = db.users.count_documents({})
+                if user_count == 0:
+                    user_data['role'] = 'admin'
+                    user_data['approved'] = True
+            except Exception as e:
+                print(f"Error checking user count: {str(e)}")
+                user_data['role'] = 'admin'  # Default to admin if can't check count
+                user_data['approved'] = True
+
+            # Insert the new user
+            result = db.users.insert_one(user_data)
+            
+            if result.inserted_id:
+                response_data = {
+                    'success': True,
+                    'message': 'Registration successful',
+                    'role': user_data['role'],
+                    'approved': user_data['approved']
+                }
+                return jsonify(response_data), 200
+            else:
+                return jsonify({
+                    'error': 'Database error',
+                    'message': 'Failed to create user'
+                }), 500
+
+        except Exception as e:
+            print(f"Signup error: {str(e)}")
+            traceback.print_exc()
+            return jsonify({
+                'error': 'Server error',
+                'message': str(e)
+            }), 500
+
+    # GET request - return the signup form
+    return render_template('signup.html')
         flash('Registration successful! Please wait for admin approval.', 'success')
         return redirect(url_for('login'))
 

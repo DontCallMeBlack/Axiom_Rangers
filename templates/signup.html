@@ -10,7 +10,12 @@
                 Create your account
             </h2>
         </div>
-        <form class="mt-8 space-y-6" method="POST">
+        
+        <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <span id="error-text" class="block sm:inline"></span>
+        </div>
+
+        <form id="signup-form" class="mt-8 space-y-6">
             <div class="rounded-md shadow-sm -space-y-px">
                 <div>
                     <input name="name" type="text" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Full name">
@@ -25,7 +30,14 @@
 
             <div>
                 <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    Sign up
+                    <span id="button-text">Sign up</span>
+                    <span id="loading-spinner" class="hidden">
+                        <!-- Loading spinner -->
+                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
                 </button>
             </div>
         </form>
@@ -36,4 +48,52 @@
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('signup-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const errorDiv = document.getElementById('error-message');
+    const errorText = document.getElementById('error-text');
+    const buttonText = document.getElementById('button-text');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    
+    // Show loading state
+    buttonText.classList.add('hidden');
+    loadingSpinner.classList.remove('hidden');
+    errorDiv.classList.add('hidden');
+    
+    try {
+        const formData = new FormData(form);
+        const response = await fetch('/signup', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Successful signup
+            if (data.role === 'admin') {
+                window.location.href = '/calculator';  // Redirect admin to calculator
+            } else {
+                window.location.href = '/pending';     // Redirect regular user to pending page
+            }
+        } else {
+            // Show error message
+            errorText.textContent = data.message || 'An error occurred during signup';
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (error) {
+        // Show error message
+        errorText.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('hidden');
+    } finally {
+        // Restore button state
+        buttonText.classList.remove('hidden');
+        loadingSpinner.classList.add('hidden');
+    }
+});
+</script>
 {% endblock %}
