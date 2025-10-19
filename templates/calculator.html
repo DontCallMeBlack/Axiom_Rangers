@@ -19,18 +19,18 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label for="currentStrength" class="block text-sm font-medium text-gray-700">Current Strength (STR) Base</label>
-                            <input type="number" id="currentStrength" value="50" class="input-field" min="1" required>
+                            <input type="number" id="currentStrength" class="input-field" min="1" required placeholder="e.g., 50">
                         </div>
                         <div>
                             <label for="currentDexterity" class="block text-sm font-medium text-gray-700">Current Dexterity (DEX) Base</label>
-                            <input type="number" id="currentDexterity" value="450" class="input-field" min="1" required>
+                            <input type="number" id="currentDexterity" class="input-field" min="1" required placeholder="e.g., 450">
                         </div>
                     </div>
                     
                     <!-- Current Level -->
                     <div>
                         <label for="currentLevel" class="block text-sm font-medium text-gray-700 font-bold text-red-600">Current Level</label>
-                        <input type="number" id="currentLevel" value="101" class="input-field border-red-400" min="1" required>
+                        <input type="number" id="currentLevel" class="input-field border-red-400" min="1" required placeholder="e.g., 101">
                         <p class="text-xs text-gray-500 mt-1">Calculates points as: (Level - 1) * 5</p>
                     </div>
 
@@ -38,17 +38,17 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label for="physicalDamage" class="block text-sm font-medium text-gray-700">Physical Damage (Weapon)</label>
-                            <input type="number" id="physicalDamage" value="100" class="input-field" min="1" required>
+                            <input type="number" id="physicalDamage" class="input-field" min="1" required placeholder="e.g., 100">
                         </div>
                         <div>
                             <label for="weaponAbility" class="block text-sm font-medium text-gray-700">Weapon Ability Stat</label>
-                            <input type="number" id="weaponAbility" value="50" class="input-field" min="0" required>
+                            <input type="number" id="weaponAbility" class="input-field" min="0" required placeholder="e.g., 50">
                         </div>
                     </div>
 
                     <div>
                         <label for="rangedCombatSkill" class="block text-sm font-medium text-gray-700">Ranged Combat Skill (e.g., 100)</label>
-                        <input type="number" id="rangedCombatSkill" value="100" class="input-field" min="1" required>
+                        <input type="number" id="rangedCombatSkill" class="input-field" min="1" required placeholder="e.g., 100">
                     </div>
 
                     <!-- Cooldowns -->
