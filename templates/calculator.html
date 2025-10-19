@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}Calculator - Axiom Rangers{% endblock %}
+
+{% block content %}
+    <div class="w-full max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="4xl font-bold text-gray-800 mb-2">Axiom Rangers DPS Optimizer</h1>
+            <p class="text-gray-600">Calculate the optimal stat allocation for your Axiom Ranger character.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Input Card -->
+            <div class="card bg-white p-6 rounded-xl lg:col-span-1 border border-blue-200">
+                <h2 class="text-2xl font-semibold mb-6 text-blue-600 border-b pb-2">Ranger Stats & Cooldowns</h2>
+                
+                <form id="dps-form" class="space-y-4">
+                    <!-- Base Stat Pool -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="currentStrength" class="block text-sm font-medium text-gray-700">Current Strength (STR) Base</label>
+                            <input type="number" id="currentStrength" value="50" class="input-field" min="1" required>
+                        </div>
+                        <div>
+                            <label for="currentDexterity" class="block text-sm font-medium text-gray-700">Current Dexterity (DEX) Base</label>
+                            <input type="number" id="currentDexterity" value="450" class="input-field" min="1" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Level -->
+                    <div>
+                        <label for="currentLevel" class="block text-sm font-medium text-gray-700 font-bold text-red-600">Current Level</label>
+                        <input type="number" id="currentLevel" value="101" class="input-field border-red-400" min="1" required>
+                        <p class="text-xs text-gray-500 mt-1">Calculates points as: (Level - 1) * 5</p>
+                    </div>
+
+                    <!-- Weapon/Skill Constants -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="physicalDamage" class="block text-sm font-medium text-gray-700">Physical Damage (Weapon)</label>
+                            <input type="number" id="physicalDamage" value="100" class="input-field" min="1" required>
+                        </div>
+                        <div>
+                            <label for="weaponAbility" class="block text-sm font-medium text-gray-700">Weapon Ability Stat</label>
+                            <input type="number" id="weaponAbility" value="50" class="input-field" min="0" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="rangedCombatSkill" class="block text-sm font-medium text-gray-700">Ranged Combat Skill (e.g., 100)</label>
+                        <input type="number" id="rangedCombatSkill" value="100" class="input-field" min="1" required>
+                    </div>
+
+                    <!-- Cooldowns -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="sharpshotCooldown" class="block text-sm font-medium text-gray-700">Sharpshot CD (seconds)</label>
+                            <input type="number" id="sharpshotCooldown" value="8.0" step="0.1" class="input-field" min="0.1" required>
+                        </div>
+                        <div>
+                            <label for="longshotCooldown" class="block text-sm font-medium text-gray-700">Longshot CD (seconds)</label>
+                            <input type="number" id="longshotCooldown" value="11.2" step="0.1" class="input-field" min="0.1" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition duration-150 transform hover:scale-105 shadow-lg">
+                        Calculate Optimal Level-Up
+                    </button>
+                </form>
+            </div>
+
+            <!-- Output Card -->
+            <div class="card bg-gray-50 p-6 rounded-xl lg:col-span-2 border border-green-200">
+                <h2 class="text-2xl font-semibold mb-6 text-green-600 border-b pb-2">Optimization Results</h2>
+                <div id="dps-results" class="space-y-4">
+                    <p class="text-gray-500">Enter your current stats and level to find the best way to spend your accumulated stat points.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CORE RANGER DPS LOGIC ---
+
+        const AUTO_ATTACK_TIME = 1.33;       // seconds per hit
+        const LONGSHOT_CAST_TIME = 1.4;      // Stays the same
+        const ELEMENTAL_DAMAGE = 0;          // Elemental damage is ignored (set to 0)
+
+        // Function to calculate DPS for a given allocation
+        function calculateDps(strength, dexterity, constants) {
+            const { 
+                physicalDamage, 
+                weaponAbility, 
+                rangedCombatSkill, 
+                sharpshotCooldown, 
+                longshotCooldown 
+            } = constants;
+            
+            if (strength <= 0 || dexterity <= 0 || sharpshotCooldown <= 0 || longshotCooldown <= 0) {
+                return 0.0;
+            }
+
+            const SHARPSHOT_COOLDOWN = sharpshotCooldown;
+            const LONGSHOT_COOLDOWN = longshotCooldown;
+            const LONGSHOT_CYCLE_TIME = LONGSHOT_COOLDOWN + LONGSHOT_CAST_TIME;
+
+            const steadyAimBonus = (
+                103 + 36.75 * (
+                    1 + Math.sqrt(dexterity / 16) + Math.sqrt(rangedCombatSkill)
+                )
+            ) / 500;
+
+            const sharpenWeaponsBonus = (
+                38.75 + 7.35 * (
+                    1 + Math.sqrt(dexterity / 8) + Math.sqrt(rangedCombatSkill)
+                )
+            );
+
+            const baseAutoDamageRaw = (
+                0.159132 * Math.sqrt(strength) +
+                0.05972 * Math.sqrt(weaponAbility) +
+                0.96523
+            ) * physicalDamage;
+
+            const baseHitDamage = baseAutoDamageRaw + steadyAimBonus + sharpenWeaponsBonus;
+
+            const autoAttackHit = baseHitDamage + ELEMENTAL_DAMAGE;
+            const autoAttackDps = autoAttackHit / AUTO_ATTACK_TIME;
+
+            const sharpshotDamageRaw = (
+                350 + 259.2 * (
+                    1 + Math.sqrt(dexterity / 6) + Math.sqrt(rangedCombatSkill)
+                )
+            );
+            const sharpshotHit = sharpshotDamageRaw + ELEMENTAL_DAMAGE;
+            const sharpshotDps = sharpshotHit / SHARPSHOT_COOLDOWN;
+
+            const longshotBaseDamage = (
+                250 + 259.2 * (
+                    1 + Math.sqrt(dexterity / 5) + Math.sqrt(rangedCombatSkill)
+                )
+            );
+            const totalLongshotDamage = longshotBaseDamage + baseHitDamage;
+            const longshotHit = totalLongshotDamage + ELEMENTAL_DAMAGE;
+            const longshotDps = longshotHit / LONGSHOT_CYCLE_TIME;
+
+            const totalDps = autoAttackDps + sharpshotDps + longshotDps;
+            return totalDps;
+        }
+
+        document.getElementById('dps-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const currentStrength = parseInt(document.getElementById('currentStrength').value);
+            const currentDexterity = parseInt(document.getElementById('currentDexterity').value);
+            const currentLevel = parseInt(document.getElementById('currentLevel').value);
+            
+            const physicalDamage = parseFloat(document.getElementById('physicalDamage').value);
+            const weaponAbility = parseFloat(document.getElementById('weaponAbility').value);
+            const rangedCombatSkill = parseFloat(document.getElementById('rangedCombatSkill').value);
+            const sharpshotCooldown = parseFloat(document.getElementById('sharpshotCooldown').value);
+            const longshotCooldown = parseFloat(document.getElementById('longshotCooldown').value);
+
+            const additionalPoints = Math.max(0, (currentLevel - 1) * 5);
+            
+            if (currentStrength <= 0 || currentDexterity <= 0 || sharpshotCooldown <= 0 || longshotCooldown <= 0 || currentLevel < 1) {
+                 document.getElementById('dps-results').innerHTML = '<p class="text-red-600 font-bold">Error: Base stats and Cooldowns must be greater than zero. Level must be 1 or higher.</p>';
+                 return;
+            }
+
+            const constants = {
+                physicalDamage,
+                weaponAbility,
+                rangedCombatSkill,
+                sharpshotCooldown,
+                longshotCooldown
+            };
+            
+            const resultsDiv = document.getElementById('dps-results');
+            
+            let maxDps = 0.0;
+            let optimalStrGain = 0;
+            let optimalDexGain = 0;
+            
+            if (additionalPoints === 0) {
+                 maxDps = calculateDps(currentStrength, currentDexterity, constants);
+            } else {
+                for (let str_gain = 0; str_gain <= additionalPoints; str_gain++) {
+                    const dex_gain = additionalPoints - str_gain;
+                    
+                    const final_strength = currentStrength + str_gain;
+                    const final_dexterity = currentDexterity + dex_gain;
+
+                    const currentDps = calculateDps(final_strength, final_dexterity, constants);
+
+                    if (currentDps > maxDps) {
+                        maxDps = currentDps;
+                        optimalStrGain = str_gain;
+                        optimalDexGain = dex_gain;
+                    }
+                }
+            }
+            
+            const finalOptimalStr = currentStrength + optimalStrGain;
+            const finalOptimalDex = currentDexterity + optimalDexGain;
+
+            let allocationText = additionalPoints === 0 
+                ? `<p class="text-lg"><span class="font-bold text-gray-700">Level ${currentLevel} grants 0 points.</span> DPS is calculated based on current stats.</p>`
+                : `<p class="text-lg"><span class="font-bold text-red-600">Strength Gain:</span> ${optimalStrGain} points</p>
+                   <p class="text-lg"><span class="font-bold text-red-600">Dexterity Gain:</span> ${optimalDexGain} points</p>`;
+
+            let outputHTML = `
+                <div class="bg-green-100 p-4 rounded-lg border border-green-300">
+                    <h3 class="text-xl font-bold text-green-800 mb-2">Maximum Potential Sustained DPS:</h3>
+                    <p class="text-4xl font-extrabold text-green-600">${maxDps.toFixed(2)} DPS</p>
+                </div>
+
+                <div class="space-y-2">
+                    <h3 class="text-lg font-bold text-gray-800 border-b pb-1">Optimal Allocation (${additionalPoints} Total Points):</h3>
+                    ${allocationText}
+                </div>
+
+                <div class="bg-yellow-100 p-3 rounded-lg border border-yellow-300">
+                    <h3 class="text-lg font-bold text-gray-800 mb-1">Resulting Final Stats:</h3>
+                    <p class="text-xl font-semibold text-yellow-800">STR: ${finalOptimalStr} / DEX: ${finalOptimalDex}</p>
+                    <p class="text-xs text-gray-700 mt-2">
+                        The tool confirms the best way to spend the ${additionalPoints} points earned from level ${currentLevel}.
+                    </p>
+                </div>
+            `;
+
+            resultsDiv.innerHTML = outputHTML;
+        });
+    </script>
+{% endblock %}
