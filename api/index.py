@@ -1,14 +1,19 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, g
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from bson.objectid import ObjectId
+from pymongo import MongoClient
 import os
 import secrets
 import traceback
 
 app = Flask(__name__, template_folder='../templates')
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
 # Error handler for 500 errors
 @app.errorhandler(500)
@@ -24,23 +29,21 @@ def not_found_error(error):
 client = None
 
 def get_db():
-    global client
     try:
         mongo_uri = os.environ.get('MONGODB_URI')
         print(f"DEBUG: MONGODB_URI from env: {mongo_uri}")
         if not mongo_uri:
             print("ERROR: MONGODB_URI environment variable is not set")
             return None
-        if client is None:
-            print(f"DEBUG: Attempting to connect to MongoDB...")
-            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000, socketTimeoutMS=10000)
-            try:
-                client.admin.command('ping')
-                print("DEBUG: Successfully connected to MongoDB")
-            except Exception as e:
-                print(f"ERROR: MongoDB ping failed: {str(e)}")
-                traceback.print_exc()
-                return None
+        print(f"DEBUG: Creating new MongoClient for each request...")
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000, socketTimeoutMS=10000)
+        try:
+            client.admin.command('ping')
+            print("DEBUG: Successfully connected to MongoDB")
+        except Exception as e:
+            print(f"ERROR: MongoDB ping failed: {str(e)}")
+            traceback.print_exc()
+            return None
         print("DEBUG: Returning client['damage_ranger']")
         return client['damage_ranger']
     except Exception as e:
@@ -73,34 +76,16 @@ def before_request():
 @app.teardown_appcontext
 def teardown_db(exception):
     db = g.pop('db', None)
-    if db is not None:
-        global client
-        if client is not None:
-            client.close()
-            client = None
+    # No teardown needed for serverless MongoDB client
 
 # Generate a secret key if not exists
 def get_or_create_secret_key():
     try:
         return os.environ.get('SECRET_KEY') or secrets.token_hex(32)
-    except:
+    except Exception:
         return secrets.token_hex(32)
 
 app.secret_key = get_or_create_secret_key()
-# Configure Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-# Basic route to test the application
-@app.route('/api/health')
-def health_check():
-    try:
-        # Test database connection
-        g.db.command('ping')
-        return jsonify({"status": "healthy", "database": "connected"}), 200
-    except Exception as e:
-        return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
 class User(UserMixin):
     def __init__(self, user_data):
@@ -130,12 +115,12 @@ def admin_required(f):
 @app.route('/')
 def index():
     try:
-        if g.db.command('ping'):
-            return jsonify({
-                "status": "ok",
-                "message": "Application is running",
-                "database": "connected"
-            })
+        # No need to close client in serverless; connection is per-request
+        return jsonify({
+            "status": "ok",
+            "message": "API is running",
+            "database": "connected"
+        })
     except Exception as e:
         return jsonify({
             "status": "error",
