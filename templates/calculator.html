@@ -5,7 +5,7 @@
 {% block content %}
     <div class="w-full max-w-4xl mx-auto">
         <header class="text-center mb-8">
-            <h1 class="4xl font-bold text-gray-800 mb-2">Axiom Rangers DPS Optimizer</h1>
+            <h1 class="4xl font-bold text-gray-800 mb-2">Axiom Rangers DPM Optimizer</h1>
             <p class="text-gray-600">Calculate the optimal stat allocation for your Axiom Ranger character.</p>
         </header>
 
@@ -46,9 +46,17 @@
                         </div>
                     </div>
 
-                    <div>
-                        <label for="rangedCombatSkill" class="block text-sm font-medium text-gray-700">Ranged Combat Skill (e.g., 100)</label>
-                        <input type="number" id="rangedCombatSkill" value="0" class="input-field" min="0" required>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label for="rangedCombatSkill" class="block text-sm font-medium text-gray-700">Ranged Combat Skill (e.g., 100)</label>
+                            <input type="number" id="rangedCombatSkill" value="0" class="input-field" min="0" required>
+                        </div>
+
+                        <!-- NEW: Elemental Damage -->
+                        <div>
+                            <label for="elementalDamage" class="block text-sm font-medium text-gray-700">Elemental Damage</label>
+                            <input type="number" id="elementalDamage" value="0" class="input-field" min="0" required>
+                        </div>
                     </div>
 
                     <!-- Cooldowns -->
@@ -84,7 +92,7 @@
             <!-- Output Card -->
             <div class="card bg-gray-50 p-6 rounded-xl lg:col-span-2 border border-green-200">
                 <h2 class="text-2xl font-semibold mb-6 text-green-600 border-b pb-2">Optimization Results</h2>
-                <div id="dps-results" class="space-y-4">
+                <div id="dpm-results" class="space-y-4">
                     <p class="text-gray-500">Enter your current stats and level to find the best way to spend your accumulated stat points.</p>
                 </div>
             </div>
@@ -92,22 +100,23 @@
     </div>
 
     <script>
-        // --- CORE RANGER DPS LOGIC ---
+        // --- CORE RANGER DPM LOGIC ---
 
         const AUTO_ATTACK_TIME = 1.33;       // seconds per hit
         const LONGSHOT_CAST_TIME = 1.4;      // Stays the same
-        const ELEMENTAL_DAMAGE = 0;          // Elemental damage is ignored (set to 0)
 
-        // Function to calculate DPS for a given allocation
-        function calculateDps(strength, dexterity, constants) {
+        // Function to calculate DPM for a given allocation
+        function calculateDpm(strength, dexterity, constants) {
             const { 
                 physicalDamage, 
                 weaponAbility, 
                 rangedCombatSkill, 
                 sharpshotCooldown, 
-                longshotCooldown 
+                longshotCooldown,
+                elementalDamage
             } = constants;
             
+            // Basic check to prevent calculation errors from Math.sqrt(negative values)
             if (strength <= 0 || dexterity <= 0 || sharpshotCooldown <= 0 || longshotCooldown <= 0) {
                 return 0.0;
             }
@@ -136,33 +145,41 @@
 
             const baseHitDamage = baseAutoDamageRaw + steadyAimBonus + sharpenWeaponsBonus;
 
-            const autoAttackHit = baseHitDamage + ELEMENTAL_DAMAGE;
+            // --- AUTO ATTACK DPM ---
+            const autoAttackHit = baseHitDamage + elementalDamage;
             const autoAttackDps = autoAttackHit / AUTO_ATTACK_TIME;
 
+            // --- SHARPSHOT DPM ---
             const sharpshotDamageRaw = (
                 350 + 259.2 * (
                     1 + Math.sqrt(dexterity / 6) + Math.sqrt(rangedCombatSkill)
                 )
             );
-            const sharpshotHit = sharpshotDamageRaw + ELEMENTAL_DAMAGE;
+            const sharpshotHit = sharpshotDamageRaw + elementalDamage;
             const sharpshotDps = sharpshotHit / SHARPSHOT_COOLDOWN;
 
+            // --- LONGSHOT DPM ---
+            // longshot = 250 + 259.2 * (1 + sqrt(dex/5) + sqrt(ranged_combat100)) + auto damage
             const longshotBaseDamage = (
                 250 + 259.2 * (
                     1 + Math.sqrt(dexterity / 5) + Math.sqrt(rangedCombatSkill)
                 )
             );
             const totalLongshotDamage = longshotBaseDamage + baseHitDamage;
-            const longshotHit = totalLongshotDamage + ELEMENTAL_DAMAGE;
+            const longshotHit = totalLongshotDamage + elementalDamage;
             const longshotDps = longshotHit / LONGSHOT_CYCLE_TIME;
 
+            // --- TOTAL DPM ---
             const totalDps = autoAttackDps + sharpshotDps + longshotDps;
-            return totalDps;
+            return totalDps * 60; // Convert DPS to DPM
         }
+
+        // --- WEB APPLICATION LOGIC ---
 
         document.getElementById('dps-form').addEventListener('submit', function(event) {
             event.preventDefault();
             
+            // 1. Read Base Inputs
             const currentStrength = parseInt(document.getElementById('currentStrength').value);
             const currentDexterity = parseInt(document.getElementById('currentDexterity').value);
             const currentLevel = parseInt(document.getElementById('currentLevel').value);
@@ -170,13 +187,16 @@
             const physicalDamage = parseFloat(document.getElementById('physicalDamage').value);
             const weaponAbility = parseFloat(document.getElementById('weaponAbility').value);
             const rangedCombatSkill = parseFloat(document.getElementById('rangedCombatSkill').value);
+            const elementalDamage = parseFloat(document.getElementById('elementalDamage').value);
             const sharpshotCooldown = parseFloat(document.getElementById('sharpshotCooldown').value);
             const longshotCooldown = parseFloat(document.getElementById('longshotCooldown').value);
 
-            const additionalPoints = Math.max(0, (currentLevel - 1) * 5);
+            // Calculate additional points based on level
+            const additionalPoints = Math.max(0, (currentLevel - 1) * 5); // Ensure points is not negative
             
-            if (currentStrength <= 0 || currentDexterity <= 0 || sharpshotCooldown <= 0 || longshotCooldown <= 0 || currentLevel < 1) {
-                 document.getElementById('dps-results').innerHTML = '<p class="text-red-600 font-bold">Error: Base stats and Cooldowns must be greater than zero. Level must be 1 or higher.</p>';
+            // Basic validation
+            if (currentStrength < 0 || currentDexterity < 0 || sharpshotCooldown <= 0 || longshotCooldown <= 0 || currentLevel < 1) {
+                 document.getElementById('dpm-results').innerHTML = '<p class="text-red-600 font-bold">Error: Base stats and Cooldowns must be greater than zero. Level must be 1 or higher.</p>';
                  return;
             }
 
@@ -185,28 +205,32 @@
                 weaponAbility,
                 rangedCombatSkill,
                 sharpshotCooldown,
-                longshotCooldown
+                longshotCooldown,
+                elementalDamage
             };
             
-            const resultsDiv = document.getElementById('dps-results');
+            const resultsDiv = document.getElementById('dpm-results');
             
-            let maxDps = 0.0;
+            // 2. Run Optimization Loop for Additional Points
+            let maxDpm = 0.0;
             let optimalStrGain = 0;
             let optimalDexGain = 0;
             
+            // If there are no points to spend (Level 1), calculate current DPM and skip the loop
             if (additionalPoints === 0) {
-                 maxDps = calculateDps(currentStrength, currentDexterity, constants);
+                 maxDpm = calculateDpm(currentStrength, currentDexterity, constants);
             } else {
+                // Otherwise, iterate through all possible allocations of the additional points
                 for (let str_gain = 0; str_gain <= additionalPoints; str_gain++) {
                     const dex_gain = additionalPoints - str_gain;
                     
                     const final_strength = currentStrength + str_gain;
                     const final_dexterity = currentDexterity + dex_gain;
 
-                    const currentDps = calculateDps(final_strength, final_dexterity, constants);
+                    const currentDpm = calculateDpm(final_strength, final_dexterity, constants);
 
-                    if (currentDps > maxDps) {
-                        maxDps = currentDps;
+                    if (currentDpm > maxDpm) {
+                        maxDpm = currentDpm;
                         optimalStrGain = str_gain;
                         optimalDexGain = dex_gain;
                     }
@@ -216,15 +240,16 @@
             const finalOptimalStr = currentStrength + optimalStrGain;
             const finalOptimalDex = currentDexterity + optimalDexGain;
 
+            // 3. Display Results
             let allocationText = additionalPoints === 0 
-                ? `<p class="text-lg"><span class="font-bold text-gray-700">Level ${currentLevel} grants 0 points.</span> DPS is calculated based on current stats.</p>`
+                ? `<p class="text-lg"><span class="font-bold text-gray-700">Level ${currentLevel} grants 0 points.</span> DPM is calculated based on current stats.</p>`
                 : `<p class="text-lg"><span class="font-bold text-red-600">Strength Gain:</span> ${optimalStrGain} points</p>
                    <p class="text-lg"><span class="font-bold text-red-600">Dexterity Gain:</span> ${optimalDexGain} points</p>`;
 
             let outputHTML = `
                 <div class="bg-green-100 p-4 rounded-lg border border-green-300">
-                    <h3 class="text-xl font-bold text-green-800 mb-2">Maximum Potential Sustained DPS:</h3>
-                    <p class="text-4xl font-extrabold text-green-600">${maxDps.toFixed(2)} DPS</p>
+                    <h3 class="text-xl font-bold text-green-800 mb-2">Maximum Potential Sustained Damage Per Minute:</h3>
+                    <p class="text-4xl font-extrabold text-green-600">${maxDpm.toFixed(2)} DPM</p>
                 </div>
 
                 <div class="space-y-2">
@@ -243,5 +268,7 @@
 
             resultsDiv.innerHTML = outputHTML;
         });
+
     </script>
-{% endblock %}
+</body>
+</html>
