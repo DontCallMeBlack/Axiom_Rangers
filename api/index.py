@@ -24,8 +24,8 @@ def not_found_error(error):
 client = None
 
 def get_db():
+    global client
     try:
-        global client
         mongo_uri = os.environ.get('MONGODB_URI')
         if not mongo_uri:
             print("Error: MONGODB_URI environment variable is not set")
@@ -33,20 +33,13 @@ def get_db():
         if client is None:
             print(f"Attempting to connect to MongoDB...")
             client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000, socketTimeoutMS=10000)
-            try:
-                client.admin.command('ping')
-                print("Successfully connected to MongoDB")
-            except Exception as e:
-                print(f"MongoDB ping failed: {str(e)}")
-                return None
-        # Get database name from URI or default to 'damage_ranger'
-        from urllib.parse import urlparse
-        uri_parts = urlparse(mongo_uri)
-        db_name = uri_parts.path.strip('/') or 'damage_ranger'
-        return client[db_name]
+            client.admin.command('ping')
+            print("Successfully connected to MongoDB")
+        # Always use 'damage_ranger' database
+        return client['damage_ranger']
     except Exception as e:
         print(f"MongoDB Connection Error: {str(e)}")
-        print(f"Connection String: {mongo_uri if mongo_uri else 'Not set'}")
+        print(f"Connection String: {os.environ.get('MONGODB_URI') if os.environ.get('MONGODB_URI') else 'Not set'}")
         traceback.print_exc()
         return None
 
