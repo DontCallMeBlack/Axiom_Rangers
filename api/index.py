@@ -189,10 +189,6 @@ def signup():
 
     # GET request - return the signup form
     return render_template('signup.html')
-        flash('Registration successful! Please wait for admin approval.', 'success')
-        return redirect(url_for('login'))
-
-    return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
